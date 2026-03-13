@@ -22,22 +22,23 @@ class Fetcher:
         self.limiter = limiter
         self.retries = retries
         self._primed_hosts: set[str] = set()
+        self._user_agent = random_user_agent()
 
     async def get_text(self, url: str, referer: str | None = None) -> str:
-        data = await self._request(url, referer=referer)
+        data = await self._request(url, referer=referer, resource="document")
         return data.decode("utf-8", errors="ignore")
 
     async def get_json(self, url: str, referer: str | None = None) -> dict[str, Any]:
         return json.loads(await self.get_text(url, referer=referer))
 
     async def get_bytes(self, url: str, referer: str | None = None) -> bytes:
-        return await self._request(url, referer=referer)
+        return await self._request(url, referer=referer, resource="image")
 
-    async def _request(self, url: str, referer: str | None = None) -> bytes:
+    async def _request(self, url: str, referer: str | None = None, resource: str = "document") -> bytes:
         target = urlsplit(url)
         host = target.netloc
         origin = f"{target.scheme or 'https'}://{host}"
-        headers = self._browser_headers(origin, referer=referer)
+        headers = self._browser_headers(origin, referer=referer, resource=resource)
 
         last_error: Exception | None = None
         for attempt in range(1, self.retries + 1):
@@ -76,21 +77,28 @@ class Fetcher:
         assert last_error is not None
         raise last_error
 
-    def _browser_headers(self, origin: str, referer: str | None = None) -> dict[str, str]:
-        return {
-            "User-Agent": random_user_agent(),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    def _browser_headers(self, origin: str, referer: str | None = None, resource: str = "document") -> dict[str, str]:
+        request_referer = referer or f"{origin}/"
+        referer_origin = f"{urlsplit(request_referer).scheme}://{urlsplit(request_referer).netloc}"
+        is_image = resource == "image"
+
+        headers = {
+            "User-Agent": self._user_agent,
             "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
             "Accept-Encoding": "gzip, deflate, br",
-            "Referer": referer or f"{origin}/",
-            "Upgrade-Insecure-Requests": "1",
+            "Referer": request_referer,
+            "Origin": referer_origin,
             "Cache-Control": "no-cache",
             "Pragma": "no-cache",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same-origin",
-            "Sec-Fetch-User": "?1",
         }
+
+        if is_image:
+            headers["Accept"] = "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+        else:
+            headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+            headers["Upgrade-Insecure-Requests"] = "1"
+
+        return headers
 
     async def _prime_host(self, origin: str, headers: dict[str, str]) -> None:
         probe_headers = {
