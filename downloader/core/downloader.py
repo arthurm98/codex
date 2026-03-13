@@ -18,6 +18,7 @@ from downloader.extractors.kuromangas import KuromangasExtractor
 from downloader.extractors.mangadex import MangaDexExtractor
 from downloader.extractors.mangataro import MangataroExtractor
 from downloader.extractors.mugiwaras import MugiwarasExtractor
+from downloader.extractors.sakuramangas import SakuraMangasExtractor
 from downloader.extractors.wp_manga import WPMangaExtractor
 from downloader.output.cbz import create_cbz
 
@@ -64,7 +65,14 @@ class MangaDownloader:
         logger.info("Done. Summary written to %s", self.outdir / "download_summary.json")
 
     def _pick_extractor(self, url: str, fetcher: Fetcher) -> BaseExtractor:
-        for cls in (MangaDexExtractor, MangataroExtractor, KuromangasExtractor, MugiwarasExtractor, WPMangaExtractor):
+        for cls in (
+            MangaDexExtractor,
+            MangataroExtractor,
+            KuromangasExtractor,
+            MugiwarasExtractor,
+            SakuraMangasExtractor,
+            WPMangaExtractor,
+        ):
             if cls.detect(url):
                 return cls(fetcher)
         return GenericReaderExtractor(fetcher)
