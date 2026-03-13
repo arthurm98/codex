@@ -24,6 +24,7 @@ Downloader assíncrono modular, focado **apenas em capítulos PT-BR**.
     │   ├── kuromangas.py
     │   ├── mangadex.py
     │   ├── mangataro.py
+    │   ├── sakuramangas.py
     │   └── wp_manga.py
     └── output/
         └── cbz.py
@@ -55,6 +56,7 @@ python manga_downloader.py --input urls.txt --resume --delay 0.3
 - MangáTarō (`mangataro`)
 - KuroMangas (`kuromangas`)
 - Mugiwaras Oficial (`mugiwarasoficial.com`)
+- Sakura Mangás (`sakuramangas.org`)
 - Sites WordPress de leitura (hosts com `manga`, `manhwa` ou `manhua`)
 
 Observação: o extractor genérico aplica fallback anti lazy loading agressivo (atributos `data-*`, `srcset`, `noscript` e scripts JSON) para todas as fontes baseadas em HTML.
