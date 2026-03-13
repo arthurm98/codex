@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 
 from downloader.core.fetcher import Fetcher
 from downloader.core.models import Chapter
-from downloader.core.utils import sanitize_name
+from downloader.utils.helpers import sanitize_name
 from downloader.extractors.base import BaseExtractor
 
 

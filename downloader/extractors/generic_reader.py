@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 from downloader.core.fetcher import Fetcher
 from downloader.core.models import Chapter
-from downloader.core.utils import IMAGE_EXTENSIONS, is_pt_br, sanitize_name
+from downloader.utils.helpers import IMAGE_EXTENSIONS, is_pt_br, sanitize_name
 from downloader.extractors.base import BaseExtractor
 
 SCRIPT_URL_PATTERN = re.compile(r"https?://[^\"'\s<>]+(?:jpg|jpeg|png|webp|avif)(?:\?[^\"'\s<>]*)?", re.I)

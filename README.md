@@ -1,84 +1,49 @@
-# Universal PT-BR Manga Downloader (CLI)
+# Manga Downloader (GUI)
 
-Downloader assíncrono modular, focado **apenas em capítulos PT-BR**.
+Aplicação de download de mangás PT-BR com interface moderna em **PySide6**.
 
 ## Estrutura
 
 ```text
 .
-├── manga_downloader.py
+├── main.py
+├── build_exe.bat
 ├── requirements.txt
 └── downloader/
-    ├── main.py
-    ├── cli/
-    │   └── args.py
     ├── core/
-    │   ├── downloader.py
-    │   ├── fetcher.py
-    │   ├── models.py
-    │   ├── rate_limiter.py
-    │   └── utils.py
     ├── extractors/
-    │   ├── base.py
-    │   ├── generic_reader.py
-    │   ├── kuromangas.py
-    │   ├── mangadex.py
-    │   ├── mangataro.py
-    │   ├── sakuramangas.py
-    │   └── wp_manga.py
-    └── output/
-        └── cbz.py
+    ├── gui/
+    │   ├── main_window.py
+    │   ├── theme.py
+    │   └── widgets.py
+    └── utils/
 ```
 
-## Instalação
-
-```bash
-pip install -r requirements.txt
-```
-
-## Uso
-
-```bash
-python manga_downloader.py \
-  --url https://mangadex.org/title/<id> \
-  --lang pt-br \
-  --cbz \
-  --concurrency 10
-```
-
-```bash
-python manga_downloader.py --input urls.txt --resume --delay 0.3
-```
-
-## Fontes suportadas (detecção automática)
+## Fontes suportadas
 
 - MangaDex (`mangadex.org`)
 - MangáTarō (`mangataro`)
 - KuroMangas (`kuromangas`)
 - Mugiwaras Oficial (`mugiwarasoficial.com`)
-- Sakura Mangás (`sakuramangas.org`)
-- Sites WordPress de leitura (hosts com `manga`, `manhwa` ou `manhua`)
+- Sites WordPress de leitura
 
-Observação: o extractor genérico aplica fallback anti lazy loading agressivo (atributos `data-*`, `srcset`, `noscript` e scripts JSON) para todas as fontes baseadas em HTML.
+## Executar
 
-## Regras de idioma
-
-Aceitos:
-- `pt-br`
-- `pt`
-- `pt_BR`
-- `brazilian-portuguese`
-
-Sem idioma detectável: capítulo é ignorado.
-
-## Saída
-
-```text
-Manga/
-  MangaTitle/
-    ch_001/
-      001.jpg
-      002.jpg
+```bash
+pip install -r requirements.txt
+python main.py
 ```
 
-Resumo JSON em `Manga/download_summary.json`.
+## Build para Windows 11
+
+```bash
+pyinstaller --noconfirm --onefile --windowed --name MangaDownloader main.py
+```
+
+Ou execute:
+
+```bat
+build_exe.bat
+```
+
+Saída esperada: `dist/MangaDownloader.exe`.
