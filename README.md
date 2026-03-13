@@ -49,6 +49,16 @@ python manga_downloader.py \
 python manga_downloader.py --input urls.txt --resume --delay 0.3
 ```
 
+## Fontes suportadas (detecção automática)
+
+- MangaDex (`mangadex.org`)
+- MangáTarō (`mangataro`)
+- KuroMangas (`kuromangas`)
+- Mugiwaras Oficial (`mugiwarasoficial.com`)
+- Sites WordPress de leitura (hosts com `manga`, `manhwa` ou `manhua`)
+
+Observação: o extractor genérico aplica fallback anti lazy loading agressivo (atributos `data-*`, `srcset`, `noscript` e scripts JSON) para todas as fontes baseadas em HTML.
+
 ## Regras de idioma
 
 Aceitos:

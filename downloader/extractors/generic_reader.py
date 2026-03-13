@@ -11,7 +11,8 @@ from downloader.core.models import Chapter
 from downloader.core.utils import IMAGE_EXTENSIONS, is_pt_br, sanitize_name
 from downloader.extractors.base import BaseExtractor
 
-SCRIPT_URL_PATTERN = re.compile(r"https?://[^\"'\s<>]+(?:jpg|jpeg|png|webp|avif)", re.I)
+SCRIPT_URL_PATTERN = re.compile(r"https?://[^\"'\s<>]+(?:jpg|jpeg|png|webp|avif)(?:\?[^\"'\s<>]*)?", re.I)
+PLACEHOLDER_TOKENS = ("placeholder", "spacer", "blank.gif", "lazyload")
 
 
 class GenericReaderExtractor(BaseExtractor):
@@ -38,28 +39,76 @@ class GenericReaderExtractor(BaseExtractor):
     async def get_page_images(self, chapter: Chapter) -> list[str]:
         html = await self.fetcher.get_text(chapter.chapter_url, referer=chapter.chapter_url)
         soup = BeautifulSoup(html, "html.parser")
+        images = self._extract_images_from_soup(soup, chapter.chapter_url)
+
+        # fallback para lazy loading agressivo em conteúdo renderizado dentro de <noscript>
+        for noscript in soup.select("noscript"):
+            body = noscript.decode_contents()
+            if not body:
+                continue
+            nested = BeautifulSoup(body, "html.parser")
+            images.extend(self._extract_images_from_soup(nested, chapter.chapter_url))
+
+        seen: set[str] = set()
+        out: list[str] = []
+        for image in images:
+            normalized = image.strip()
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                out.append(normalized)
+        return out
+
+    def _extract_images_from_soup(self, soup: BeautifulSoup, base_url: str) -> list[str]:
         images: list[str] = []
 
         for img in soup.select("img"):
-            for attr in ("src", "data-src", "data-lazy", "data-lazy-src", "data-original"):
-                src = img.get(attr)
-                if src and any(ext in src.lower() for ext in IMAGE_EXTENSIONS):
-                    images.append(urljoin(chapter.chapter_url, src))
+            for attr in (
+                "src",
+                "data-src",
+                "data-lazy",
+                "data-lazy-src",
+                "data-original",
+                "data-pagespeed-lazy-src",
+                "data-srcset",
+                "srcset",
+            ):
+                raw = img.get(attr)
+                if not raw:
+                    continue
+                for candidate in self._expand_image_candidates(raw):
+                    if self._looks_like_image(candidate) and self._is_real_image(candidate):
+                        images.append(urljoin(base_url, candidate))
 
         for script in soup.select("script"):
             body = script.string or script.get_text(" ", strip=True)
             if not body:
                 continue
             images.extend(SCRIPT_URL_PATTERN.findall(body))
-            images.extend(self._extract_json_images(body, chapter.chapter_url))
+            images.extend(self._extract_json_images(body, base_url))
 
-        seen: set[str] = set()
-        out: list[str] = []
-        for image in images:
-            if image not in seen:
-                seen.add(image)
-                out.append(image)
-        return out
+        return images
+
+    def _expand_image_candidates(self, raw: str) -> list[str]:
+        parts = [chunk.strip() for chunk in raw.split(",") if chunk.strip()]
+        if len(parts) <= 1:
+            return [raw.strip()]
+
+        expanded: list[str] = []
+        for part in parts:
+            candidate = part.split()[0].strip()
+            if candidate:
+                expanded.append(candidate)
+        return expanded
+
+    def _looks_like_image(self, value: str) -> bool:
+        value_lower = value.lower()
+        return any(ext in value_lower for ext in IMAGE_EXTENSIONS)
+
+    def _is_real_image(self, value: str) -> bool:
+        value_lower = value.lower()
+        if value_lower.startswith("data:image"):
+            return False
+        return not any(token in value_lower for token in PLACEHOLDER_TOKENS)
 
     def _extract_chapter_name(self, url: str, soup: BeautifulSoup) -> str:
         h1 = soup.find(["h1", "h2"])
@@ -92,6 +141,6 @@ class GenericReaderExtractor(BaseExtractor):
                 continue
             if isinstance(data, list):
                 for item in data:
-                    if isinstance(item, str) and any(ext in item.lower() for ext in IMAGE_EXTENSIONS):
+                    if isinstance(item, str) and self._looks_like_image(item) and self._is_real_image(item):
                         found.append(urljoin(base_url, item))
         return found
