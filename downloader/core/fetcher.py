@@ -5,7 +5,7 @@ import json
 import logging
 import random
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 
 import aiohttp
 
@@ -21,6 +21,7 @@ class Fetcher:
         self.session = session
         self.limiter = limiter
         self.retries = retries
+        self._primed_hosts: set[str] = set()
 
     async def get_text(self, url: str, referer: str | None = None) -> str:
         data = await self._request(url, referer=referer)
@@ -33,20 +34,27 @@ class Fetcher:
         return await self._request(url, referer=referer)
 
     async def _request(self, url: str, referer: str | None = None) -> bytes:
-        host = urlparse(url).netloc
-        headers = {
-            "User-Agent": random_user_agent(),
-            "Accept": "text/html,application/json,image/avif,image/webp,image/*,*/*;q=0.8",
-            "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.6",
-            "Referer": referer or f"https://{host}/",
-            "Cache-Control": "no-cache",
-        }
+        target = urlsplit(url)
+        host = target.netloc
+        origin = f"{target.scheme or 'https'}://{host}"
+        headers = self._browser_headers(origin, referer=referer)
 
         last_error: Exception | None = None
         for attempt in range(1, self.retries + 1):
             await self.limiter.wait(host)
             try:
                 async with self.session.get(url, headers=headers) as response:
+                    if response.status == 403 and host not in self._primed_hosts:
+                        await self._prime_host(origin, headers)
+                        self._primed_hosts.add(host)
+                        raise aiohttp.ClientResponseError(
+                            request_info=response.request_info,
+                            history=response.history,
+                            status=response.status,
+                            message="HTTP 403 (retrying with primed cookies)",
+                            headers=response.headers,
+                        )
+
                     if response.status in RETRIABLE_STATUSES:
                         raise aiohttp.ClientResponseError(
                             request_info=response.request_info,
@@ -67,3 +75,31 @@ class Fetcher:
 
         assert last_error is not None
         raise last_error
+
+    def _browser_headers(self, origin: str, referer: str | None = None) -> dict[str, str]:
+        return {
+            "User-Agent": random_user_agent(),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Referer": referer or f"{origin}/",
+            "Upgrade-Insecure-Requests": "1",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-User": "?1",
+        }
+
+    async def _prime_host(self, origin: str, headers: dict[str, str]) -> None:
+        probe_headers = {
+            **headers,
+            "Referer": origin,
+            "Sec-Fetch-Site": "none",
+        }
+        try:
+            async with self.session.get(origin, headers=probe_headers):
+                return
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Host priming failed for %s: %s", origin, exc)
